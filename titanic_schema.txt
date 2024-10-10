@@ -1,0 +1,13 @@
+PassengerId: int64 - Description of the PassengerId column.
+Survived: int64 - Indicates whether the passenger survived (0 = No, 1 = Yes).
+Pclass: int64 - Ticket class (1st, 2nd, 3rd).
+Name: object - The full name of the passenger.
+Sex: object - Gender of the passenger (male or female).
+Age: float64 - Age of the passenger in years.
+SibSp: int64 - Number of siblings/spouses aboard the Titanic.
+Parch: int64 - Number of parents/children aboard the Titanic.
+Ticket: object - The ticket number of the passenger.
+Fare: float64 - The fare paid for the ticket.
+Cabin: object - The cabin number where the passenger stayed.
+Embarked: object - Port of embarkation (C = Cherbourg; Q = Queenstown; S = Southampton).
+Titanic: table - the name of this table.
