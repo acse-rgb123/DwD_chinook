@@ -22,9 +22,11 @@ class LLM:
         User Question: {user_query}
         Use the following columns: {', '.join(relevant_columns)}
         Ensure to use these join conditions: {', '.join(join_conditions)}
+        The select should specify the necessary columns to answer the user's question.
         Use the context to determine the necessary columns to answer the user's question.
         {context}
         {rag_context}
+        The select should specify the necessary columns to answer the user's question.
         Generate a valid SQL query for this request.
         Only output the SQL query. Nothing else
         """
