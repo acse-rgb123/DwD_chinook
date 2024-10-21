@@ -12,7 +12,7 @@ class RAGSystem:
             doc_embeddings[doc_key] = self.embedding_handler.get_embedding(doc_text)
         return doc_embeddings
 
-    def retrieve_relevant_docs(self, query, similarity_threshold=0.8):
+    def retrieve_relevant_docs(self, query, similarity_threshold=0.75):
         query_embedding = self.embedding_handler.get_embedding(query)
         similarities = []
         for doc_key, doc_embedding in self.doc_embeddings.items():

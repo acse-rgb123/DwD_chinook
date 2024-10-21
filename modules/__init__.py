@@ -6,4 +6,4 @@ from .schema_mapper import SchemaMapper
 from .llm import LLM
 from .schema_extractor import SchemaExtractor
 from .pipeline import Pipeline
-
+import pandas as pd
