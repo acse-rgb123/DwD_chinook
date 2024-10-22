@@ -52,27 +52,23 @@ class Pipeline:
         print("Mapping keywords to schema and creating subgraph with valid joins...")
         schema_mapper = SchemaMapper(schema, foreign_keys, self.embedding_handler)
         
-        # Identify relevant tables first
+        # Identify relevant tables first based on similarity
         relevant_tables = schema_mapper.identify_relevant_tables(keywords)
-        
+
+        # Ensure key tables are included, such as 'Customer', if they are required
+        necessary_tables = ['Customer', 'Invoice']  # You can add other critical tables here
+        for table in necessary_tables:
+            if table not in relevant_tables:
+                relevant_tables.append(table)
+                print(f"Added necessary table: {table}")
+
         # Map keywords to columns using identified relevant tables
-        mapped_columns = schema_mapper.map_keywords_to_columns(keywords, relevant_tables)
+        subgraph, valid_columns, extra_info = schema_mapper.map_keywords_to_columns(keywords, relevant_tables)
 
-        # Create a placeholder for subgraph and join paths
-        subgraph = nx.Graph()  # Initialize an empty graph for the subgraph
-        join_paths = []  # Placeholder for join paths logic
-
-        # Get table connections from mapped columns
-        connections = schema_mapper.find_table_connections(relevant_tables)
-        
         # Print relevant outputs
         print("\nTable Connections:")
-        for connection in connections:
+        for connection in schema_mapper.find_table_connections(relevant_tables):
             print(f"{connection[0]} <-> {connection[1]} (From: {connection[2]['from_column']}, To: {connection[2]['to_column']})")
-
-        # Create subgraph from the connections
-        for connection in connections:
-            subgraph.add_edge(connection[0], connection[1], from_column=connection[2]['from_column'], to_column=connection[2]['to_column'])
 
         print("\nSubschema Nodes:")
         print(subgraph.nodes())
@@ -81,16 +77,28 @@ class Pipeline:
         for edge in subgraph.edges(data=True):
             print(f"{edge[0]} <-> {edge[1]} (From: {edge[2]['from_column']}, To: {edge[2]['to_column']})")
 
-        # Assuming you have logic to find join paths here
-        # Replace the following with actual logic for finding join paths based on the subgraph
+        print("\nOptimized Subschema Graph Nodes:")
+        print(subgraph.nodes())
+
+        print("\nOptimized Subschema Graph Edges:")
+        for edge in subgraph.edges(data=True):
+            print(f"{edge[0]} <-> {edge[1]} (From: {edge[2]['from_column']}, To: {edge[2]['to_column']})")
+
+        # Adjust join paths to ensure the required tables are present
         join_paths = schema_mapper.find_paths_between_tables(subgraph, start_table="Customer")
+        if not join_paths:
+            print("\nAdding necessary tables for join paths.")
+            subgraph.add_node('Customer')  # Add Customer manually if missing
+            # Add any other necessary tables similarly
+            join_paths = schema_mapper.find_paths_between_tables(subgraph, start_table="Customer")
 
         print("\nJoin Paths:")
         for path in join_paths:
             for join in path:
                 print(f"{join['tables'][0]} -> {join['tables'][1]} (From: {join['columns'][0]}, To: {join['columns'][1]})")
 
-        return mapped_columns, join_paths  # Adjusted return statement to include mapped_columns and join_paths
+        return valid_columns, join_paths
+
 
 
     def generate_sql(self, relevant_columns, joins, relevant_docs):

@@ -11,7 +11,7 @@ class SchemaExtractor:
         self.tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
         self.model = RobertaModel.from_pretrained('roberta-base', add_pooling_layer=False)
 
-    def extract_keywords_with_roberta(self, query, similarity_threshold=0.7, window_size=5):
+    def extract_keywords_with_roberta(self, query, similarity_threshold=0.7, window_size=2):
         inputs = self.tokenizer(query, return_tensors="pt")
         with torch.no_grad():
             outputs = self.model(**inputs)

@@ -7,7 +7,7 @@ class SchemaMapper:
         self.foreign_keys = foreign_keys
         self.embedding_handler = embedding_handler
 
-    def identify_relevant_tables(self, keywords, similarity_threshold=0.8):
+    def identify_relevant_tables(self, keywords, similarity_threshold=0.75):
         relevant_tables = set()
         keyword_embeddings = self.embedding_handler.get_embeddings_batch(keywords)  # Get embeddings for keywords
 
@@ -19,7 +19,7 @@ class SchemaMapper:
 
         return list(relevant_tables)
 
-    def map_keywords_to_columns(self, keywords, relevant_tables, similarity_threshold=0.75):
+    def map_keywords_to_columns(self, keywords, relevant_tables, similarity_threshold=0.70):
         mapped_columns = {}
         similarity_scores = []  # To store similarity scores for display
         keyword_embeddings = self.embedding_handler.get_embeddings_batch(keywords)
@@ -92,16 +92,46 @@ class SchemaMapper:
     def create_optimized_subschema(self, relevant_tables):
         subschema_graph = nx.Graph()
 
+        # Start by adding relevant tables to the graph
+        for table in relevant_tables:
+            if table in self.schema:
+                subschema_graph.add_node(table)
+
+        # Add relationships for relevant tables
         for table in relevant_tables:
             if table in self.foreign_keys:
                 for relation in self.foreign_keys[table]:
                     if relation['to_table'] in relevant_tables:
                         subschema_graph.add_edge(table, relation['to_table'], 
-                                                 from_column=relation['from'], 
-                                                 to_column=relation['to_column'])
+                                                from_column=relation['from'], 
+                                                to_column=relation['to_column'])
 
+        # Dynamically include any necessary tables based on foreign key relationships
+        necessary_tables = set()  # Use a set to avoid duplicates
+
+        for table in relevant_tables:
+            if table in self.foreign_keys:
+                for relation in self.foreign_keys[table]:
+                    necessary_tables.add(relation['to_table'])  # Add related tables
+
+        # Add necessary tables to the graph if they are not already included
+        for necessary_table in necessary_tables:
+            if necessary_table in self.schema and necessary_table not in subschema_graph.nodes:
+                subschema_graph.add_node(necessary_table)
+
+        # Construct edges again to include newly added necessary tables
+        for table in relevant_tables:
+            if table in self.foreign_keys:
+                for relation in self.foreign_keys[table]:
+                    if relation['to_table'] in necessary_tables:
+                        subschema_graph.add_edge(table, relation['to_table'], 
+                                                from_column=relation['from'], 
+                                                to_column=relation['to_column'])
+
+        # Create the minimum spanning tree from the constructed graph
         mst = nx.minimum_spanning_tree(subschema_graph)
 
+        # Debug: Print subschema nodes and edges
         print("\nSubschema Nodes:")
         print(f"    {list(mst.nodes())}")
         print("Subschema Edges (Foreign Key Joins with Column Info):")

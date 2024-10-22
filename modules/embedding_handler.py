@@ -1,26 +1,29 @@
 import openai
 import os
 from sklearn.metrics.pairwise import cosine_similarity
+from sentence_transformers import SentenceTransformer
 
 class EmbeddingHandler:
     def __init__(self):
         self.cache = {}
+        # Load the SBERT model (you can choose any model, like "all-MiniLM-L6-v2")
+        self.model = SentenceTransformer('all-MiniLM-L6-v2')
 
     def get_embedding(self, text):
         if text in self.cache:
             return self.cache[text]
         
-        # Ensure that 'text' is passed as a string and not a list
-        embedding = openai.Embedding.create(input=text, model="text-embedding-ada-002")['data'][0]['embedding']
+        # Ensure 'text' is passed as a string, not a list
+        embedding = self.model.encode(text, convert_to_tensor=False)
         self.cache[text] = embedding
         return embedding
 
     def get_embeddings_batch(self, texts):
         texts_to_embed = [text for text in texts if text not in self.cache]
         if texts_to_embed:
-            embeddings = openai.Embedding.create(input=texts_to_embed, model="text-embedding-ada-002")['data']
+            embeddings = self.model.encode(texts_to_embed, convert_to_tensor=False)
             for text, embedding in zip(texts_to_embed, embeddings):
-                self.cache[text] = embedding['embedding']
+                self.cache[text] = embedding
 
         return [self.cache[text] for text in texts]
 
