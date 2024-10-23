@@ -8,6 +8,8 @@ from .pdf_reader import PDFReader
 from .schema_mapper import SchemaMapper
 from .llm import LLM
 from .schema_extractor import SchemaExtractor
+from .subschema import SubschemaCreator  # Import SubschemaCreator from subschema.py
+
 
 class Pipeline:
     def __init__(self, db_file, user_query, pdf_path):
@@ -27,8 +29,11 @@ class Pipeline:
         # Initialize LLM for SQL generation
         self.llm = LLM()
 
-        # Initialize Schema and Keyword Extraction
+        # Initialize SchemaExtractor for schema extraction
         self.schema_extractor = SchemaExtractor(self.db_file, self.embedding_handler)
+
+        # Initialize SubschemaCreator for subschema generation
+        self.subschema_creator = SubschemaCreator(self.schema_extractor.extract_schema_from_db(), self.schema_extractor.extract_foreign_key_relations())
 
     def extract_schema_and_foreign_keys(self):
         print("Extracting schema and foreign key relationships...")
@@ -49,25 +54,56 @@ class Pipeline:
         return keywords
 
     def map_keywords_to_schema(self, schema, foreign_keys, keywords):
-        print("Mapping keywords to schema and creating subgraph with valid joins...")
+        print("Mapping keywords to schema...")
+
+        # Initialize SchemaMapper
         schema_mapper = SchemaMapper(schema, foreign_keys, self.embedding_handler)
         
         # Identify relevant tables first based on similarity
         relevant_tables = schema_mapper.identify_relevant_tables(keywords)
 
-        # Ensure key tables are included, such as 'Customer', if they are required
-        necessary_tables = ['Customer', 'Invoice']  # You can add other critical tables here
+        # Ensure key tables are included
+        necessary_tables = ['Customer', 'Invoice']
         for table in necessary_tables:
             if table not in relevant_tables:
                 relevant_tables.append(table)
                 print(f"Added necessary table: {table}")
 
         # Map keywords to columns using identified relevant tables
-        subgraph, valid_columns, extra_info = schema_mapper.map_keywords_to_columns(keywords, relevant_tables)
+        mapped_columns = schema_mapper.map_keywords_to_columns(keywords, relevant_tables)
 
         # Print relevant outputs
         print("\nTable Connections:")
-        for connection in schema_mapper.find_table_connections(relevant_tables):
+        for connection in self.subschema_creator.find_table_connections(relevant_tables):
+            print(f"{connection[0]} <-> {connection[1]} (From: {connection[2]['from_column']}, To: {connection[2]['to_column']})")
+
+        # Create subgraph and find joins using subschema_creator
+        subgraph = self.subschema_creator.create_optimized_subschema(relevant_tables)
+        print("\nSubschema Nodes:")
+        print(subgraph.nodes())
+        
+        print("\nSubschema Edges (Foreign Key Joins with Column Info):")
+        for edge in subgraph.edges(data=True):
+            print(f"{edge[0]} <-> {edge[1]} (From: {edge[2]['from_column']}, To: {edge[2]['to_column']})")
+
+        # Find join paths
+        join_paths = self.subschema_creator.find_paths_between_tables(subgraph, start_table="Customer")
+        if not join_paths:
+            print("\nAdding necessary tables for join paths.")
+            subgraph.add_node('Customer')
+            join_paths = self.subschema_creator.find_paths_between_tables(subgraph, start_table="Customer")
+
+        print("\nJoin Paths:")
+        for path in join_paths:
+            for join in path:
+                print(f"{join['tables'][0]} -> {join['tables'][1]} (From: {join['columns'][0]}, To: {join['columns'][1]})")
+
+        return mapped_columns, join_paths
+
+
+        # Print relevant outputs
+        print("\nTable Connections:")
+        for connection in self.subschema_creator.find_table_connections(relevant_tables):
             print(f"{connection[0]} <-> {connection[1]} (From: {connection[2]['from_column']}, To: {connection[2]['to_column']})")
 
         print("\nSubschema Nodes:")
@@ -85,12 +121,11 @@ class Pipeline:
             print(f"{edge[0]} <-> {edge[1]} (From: {edge[2]['from_column']}, To: {edge[2]['to_column']})")
 
         # Adjust join paths to ensure the required tables are present
-        join_paths = schema_mapper.find_paths_between_tables(subgraph, start_table="Customer")
+        join_paths = self.subschema_creator.find_paths_between_tables(subgraph, start_table="Customer")
         if not join_paths:
             print("\nAdding necessary tables for join paths.")
             subgraph.add_node('Customer')  # Add Customer manually if missing
-            # Add any other necessary tables similarly
-            join_paths = schema_mapper.find_paths_between_tables(subgraph, start_table="Customer")
+            join_paths = self.subschema_creator.find_paths_between_tables(subgraph, start_table="Customer")
 
         print("\nJoin Paths:")
         for path in join_paths:
@@ -98,8 +133,6 @@ class Pipeline:
                 print(f"{join['tables'][0]} -> {join['tables'][1]} (From: {join['columns'][0]}, To: {join['columns'][1]})")
 
         return valid_columns, join_paths
-
-
 
     def generate_sql(self, relevant_columns, joins, relevant_docs):
         print("Generating SQL query with LLM...")
@@ -137,18 +170,26 @@ class Pipeline:
         return analysis
 
     def run(self):
+        """Run the entire pipeline."""
+        # Retrieve relevant documents
         relevant_docs = self.rag_system.retrieve_relevant_docs(self.user_query)
         
+        # Extract schema and foreign keys
         schema, foreign_keys = self.extract_schema_and_foreign_keys()
 
+        # Extract keywords
         keywords = self.extract_keywords()
 
+        # Map keywords to schema and find valid joins
         relevant_columns, joins = self.map_keywords_to_schema(schema, foreign_keys, keywords)
 
+        # Generate the SQL query
         sql_query = self.generate_sql(relevant_columns, joins, relevant_docs)
 
+        # Execute the SQL query
         result_df = self.execute_sql(sql_query)
 
+        # Analyze the result
         analysis = self.analyze_result(result_df)
 
         return analysis

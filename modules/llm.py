@@ -20,20 +20,15 @@ class LLM:
                 join_conditions.append(f"{table1}.{from_column} = {table2}.{to_column}")
         input_text = f"""
         User Question: {user_query}
-        Use the following columns: {', '.join(relevant_columns)}
-        Ensure to use these join conditions: {', '.join(join_conditions)}
-        The select should specify the necessary columns to answer the user's question.
-        Use the context to determine the necessary columns to answer the user's question.
-        {context}
-        {rag_context}
-        The select should specify the necessary columns to answer the user's question.
-        Generate a valid SQL query for this request.
-        Only output the SQL query. Nothing else
+        ONLY USE THESE columns: {', '.join(relevant_columns)}
+        ONLY USE join conditions: {', '.join(join_conditions)}
+        Generate only the correct SQLlite query to answer this query please. no additional comments.
+        Include all information neccessary in the SQL select labelled appropriatley to answer {user_query};
         """
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": "You generate SQL queries based on user inputs and database schema."},
+                {"role": "system", "content": "You are a maste at generating SQL queries based on user inputs and database schema."},
                 {"role": "user", "content": input_text}
             ],
             max_tokens=300,
