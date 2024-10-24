@@ -55,9 +55,6 @@ class SchemaMapper:
         print("\nBottom 10 Similarity Scores between Keywords and Columns:")
         print(similarity_df.tail(10))
 
-        # Debug: Print the mapped columns
-        print(f"Mapped Columns: {mapped_columns}")
-
         # Return only the mapped columns (no subgraph, no extra info)
         return mapped_columns
 

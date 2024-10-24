@@ -48,8 +48,5 @@ def main():
     # Run the pipeline and get the analysis result
     analysis = pipeline.run()
 
-    # Print the analysis results
-    print(analysis)
-
 if __name__ == "__main__":
     main()
