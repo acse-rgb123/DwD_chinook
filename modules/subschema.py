@@ -30,7 +30,6 @@ class SubschemaCreator:
                         }))
         
         # Debug: Print table connections
-        print("\nTable Connections:")
         for conn in connections:
             print(f"    {conn[0]} <-> {conn[1]} (From: {conn[2]['from_column']}, To: {conn[2]['to_column']})")
 
