@@ -100,40 +100,6 @@ class Pipeline:
 
         return mapped_columns, join_paths
 
-
-        # Print relevant outputs
-        print("\nTable Connections:")
-        for connection in self.subschema_creator.find_table_connections(relevant_tables):
-            print(f"{connection[0]} <-> {connection[1]} (From: {connection[2]['from_column']}, To: {connection[2]['to_column']})")
-
-        print("\nSubschema Nodes:")
-        print(subgraph.nodes())
-        
-        print("\nSubschema Edges (Foreign Key Joins with Column Info):")
-        for edge in subgraph.edges(data=True):
-            print(f"{edge[0]} <-> {edge[1]} (From: {edge[2]['from_column']}, To: {edge[2]['to_column']})")
-
-        print("\nOptimized Subschema Graph Nodes:")
-        print(subgraph.nodes())
-
-        print("\nOptimized Subschema Graph Edges:")
-        for edge in subgraph.edges(data=True):
-            print(f"{edge[0]} <-> {edge[1]} (From: {edge[2]['from_column']}, To: {edge[2]['to_column']})")
-
-        # Adjust join paths to ensure the required tables are present
-        join_paths = self.subschema_creator.find_paths_between_tables(subgraph, start_table="Customer")
-        if not join_paths:
-            print("\nAdding necessary tables for join paths.")
-            subgraph.add_node('Customer')  # Add Customer manually if missing
-            join_paths = self.subschema_creator.find_paths_between_tables(subgraph, start_table="Customer")
-
-        print("\nJoin Paths:")
-        for path in join_paths:
-            for join in path:
-                print(f"{join['tables'][0]} -> {join['tables'][1]} (From: {join['columns'][0]}, To: {join['columns'][1]})")
-
-        return valid_columns, join_paths
-
     def generate_sql(self, relevant_columns, joins, relevant_docs):
         print("Generating SQL query with LLM...")
         column_documentation_matches = {col: [(col, 1.0)] for col in relevant_columns}
@@ -149,10 +115,11 @@ class Pipeline:
 
         conn = sqlite3.connect(self.db_file)
         try:
+            # Execute the SQL query and fetch the results into a DataFrame
             df = pd.read_sql_query(sql_query, conn)
-            if df is not None:
+            if df is not None and not df.empty:
                 print("\nSQL Query Results (Pandas DataFrame):")
-                display(df)  # This will display the DataFrame in a Jupyter notebook format
+                print(df.to_string(index=False))  # Print the DataFrame as a table without index
             else:
                 print("No results returned from the SQL query.")
             return df
@@ -161,6 +128,7 @@ class Pipeline:
             return None
         finally:
             conn.close()
+
 
     def analyze_result(self, result_df):
         print("Analyzing result with LLM...")
