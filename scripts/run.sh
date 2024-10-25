@@ -12,7 +12,7 @@ fi
 echo "Installing dependencies..."
 
 # Install the necessary Python packages, excluding sqlite3 which is part of the standard library
-pip install pandas networkx openai python-dotenv PyPDF2 > /dev/null 2>&1
+pip install pandas networkx openai python-dotenv tabulate PyPDF2 > /dev/null 2>&1
 
 if [ $? -ne 0 ]; then
   echo "Error installing dependencies."

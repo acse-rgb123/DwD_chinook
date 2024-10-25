@@ -1,25 +1,56 @@
 import pandas as pd
+from tabulate import tabulate
 
 class SchemaMapper:
     def __init__(self, schema, foreign_keys, embedding_handler):
         self.schema = schema
-        self.foreign_keys = foreign_keys  # Add this to initialize foreign_keys
+        self.foreign_keys = foreign_keys  # Initialize foreign keys
         self.embedding_handler = embedding_handler
 
-    def identify_relevant_tables(self, keywords, similarity_threshold=0.75):
-        relevant_tables = set()
+    def identify_relevant_tables_and_columns(self, keywords, similarity_threshold=0.75):
+        relevant_tables = set()  # Set to store relevant tables
+        relevant_columns = []    # List to store relevant columns and their similarity scores
         keyword_embeddings = self.embedding_handler.get_embeddings_batch(keywords)  # Get embeddings for keywords
 
+        # Create a list to store the results in a structured way
+        results = []
+
         for keyword, keyword_embedding in zip(keywords, keyword_embeddings):
-            for table in self.schema.keys():
+            # Loop through each table in the schema
+            for table, columns in self.schema.items():
                 table_embedding = self.embedding_handler.get_embedding(table)  # Get embedding for table name
-                if self.embedding_handler.calculate_similarity(keyword_embedding, table_embedding) >= similarity_threshold:
+
+                # Check if the table itself is relevant based on the similarity threshold
+                table_similarity = self.embedding_handler.calculate_similarity(keyword_embedding, table_embedding)
+                if table_similarity >= similarity_threshold:
                     relevant_tables.add(table)
 
-        # Debug: Print relevant tables
-        print(f"Relevant Tables: {relevant_tables}")
+                    # Now check columns within the table by combining table and column names
+                    for column in columns:
+                        table_column = f"{table}.{column}"  # Combine table and column names
+                        column_embedding = self.embedding_handler.get_embedding(table_column)  # Get embedding for table.column
 
-        return list(relevant_tables)
+                        # Calculate the similarity for the combined table.column
+                        column_similarity = self.embedding_handler.calculate_similarity(keyword_embedding, column_embedding)
+
+                        # If the similarity for the combined table.column exceeds the threshold, add it to relevant columns
+                        if column_similarity >= similarity_threshold:
+                            relevant_columns.append((table, column, column_similarity))
+                            results.append({
+                                "Keyword": keyword,
+                                "Table.Column": table_column,
+                                "Similarity Score": column_similarity
+                            })
+
+        # Convert the results into a DataFrame for neat printing
+        df_results = pd.DataFrame(results)
+
+        # Print all relevant tables and columns in a table format
+        print("\nRelevant Tables and Columns with Similarity Scores:")
+        print(tabulate(df_results, headers='keys', tablefmt='pretty'))
+
+        # Return relevant tables and relevant columns along with their similarity scores
+        return list(relevant_tables), relevant_columns 
 
     def map_keywords_to_columns(self, keywords, relevant_tables, similarity_threshold=0.60):
         mapped_columns = {}
@@ -44,17 +75,17 @@ class SchemaMapper:
             best_matches = sorted(best_matches, key=lambda x: x[1], reverse=True)[:3]
             mapped_columns[keyword] = best_matches
 
-        # Create a DataFrame from similarity scores for debugging or analysis
+        # Create a DataFrame from similarity scores for analysis
         similarity_df = pd.DataFrame(similarity_scores, columns=['Keyword', 'Column', 'Similarity'])
         similarity_df = similarity_df.sort_values(by='Similarity', ascending=False)
 
-        # Print the top 10 and bottom 10 similarity scores for debugging
+        # Print the top 10 similarity scores for debugging
         print("\nTop 10 Similarity Scores between Keywords and Columns:")
-        print(similarity_df.head(10))
+        print(tabulate(similarity_df.head(10), headers='keys', tablefmt='pretty'))
 
+        # Print the bottom 10 similarity scores for debugging
         print("\nBottom 10 Similarity Scores between Keywords and Columns:")
-        print(similarity_df.tail(10))
+        print(tabulate(similarity_df.tail(10), headers='keys', tablefmt='pretty'))
 
-        # Return only the mapped columns (no subgraph, no extra info)
+        # Return only the mapped columns
         return mapped_columns
-
