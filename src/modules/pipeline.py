@@ -10,14 +10,15 @@ from .llm import LLM
 from .schema_extractor import SchemaExtractor
 from .subschema import SubschemaCreator  # Import SubschemaCreator from subschema.py
 
-
 class Pipeline:
-    def __init__(self, db_file, user_query, pdf_path):
+    def __init__(self, db_file, user_query, pdf_path, output_dir='./data'):
         self.db_file = os.path.abspath(db_file)
         self.user_query = user_query
         self.pdf_path = os.path.abspath(pdf_path)
+        self.output_dir = output_dir
 
-        self.embedding_handler = EmbeddingHandler()
+        # Initialize the EmbeddingHandler with the output directory for saving files
+        self.embedding_handler = EmbeddingHandler(output_dir=self.output_dir)
 
         # PDF Reader for extracting documentation
         self.pdf_reader = PDFReader(self.pdf_path)
@@ -128,7 +129,6 @@ class Pipeline:
             return None
         finally:
             conn.close()
-
 
     def analyze_result(self, result_df):
         print("Analyzing result with LLM...")
