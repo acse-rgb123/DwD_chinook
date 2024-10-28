@@ -61,7 +61,7 @@ class Pipeline:
         schema_mapper = SchemaMapper(schema, foreign_keys, self.embedding_handler)
         
         # Identify relevant tables first based on similarity
-        relevant_tables = schema_mapper.identify_relevant_tables(keywords)
+        relevant_tables, relevant_columns = schema_mapper.identify_relevant_tables_and_columns(keywords)
 
         # Ensure key tables are included
         necessary_tables = ['Customer', 'Invoice']

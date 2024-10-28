@@ -1,6 +1,9 @@
 import pandas as pd
 from tabulate import tabulate
 
+import pandas as pd
+from tabulate import tabulate
+
 class SchemaMapper:
     def __init__(self, schema, foreign_keys, embedding_handler):
         self.schema = schema
@@ -8,8 +11,8 @@ class SchemaMapper:
         self.embedding_handler = embedding_handler
 
     def identify_relevant_tables_and_columns(self, keywords, similarity_threshold=0.75):
-        relevant_tables = set()  # Set to store relevant tables
-        relevant_columns = []    # List to store relevant columns and their similarity scores
+        relevant_tables = []  # Changed from set to list to allow appending in the main pipeline
+        relevant_columns = []  # List to store relevant columns and their similarity scores
         keyword_embeddings = self.embedding_handler.get_embeddings_batch(keywords)  # Get embeddings for keywords
 
         # Create a list to store the results in a structured way
@@ -23,7 +26,8 @@ class SchemaMapper:
                 # Check if the table itself is relevant based on the similarity threshold
                 table_similarity = self.embedding_handler.calculate_similarity(keyword_embedding, table_embedding)
                 if table_similarity >= similarity_threshold:
-                    relevant_tables.add(table)
+                    if table not in relevant_tables:  # Avoid duplicates
+                        relevant_tables.append(table)
 
                     # Now check columns within the table by combining table and column names
                     for column in columns:
@@ -45,12 +49,13 @@ class SchemaMapper:
         # Convert the results into a DataFrame for neat printing
         df_results = pd.DataFrame(results)
 
-        # Print all relevant tables and columns in a table format
+        # Print the relevant tables and columns in a table format
         print("\nRelevant Tables and Columns with Similarity Scores:")
         print(tabulate(df_results, headers='keys', tablefmt='pretty'))
 
-        # Return relevant tables and relevant columns along with their similarity scores
-        return list(relevant_tables), relevant_columns 
+        # Return relevant tables as a list and relevant columns along with their similarity scores
+        return relevant_tables, relevant_columns  # Return as list
+
 
     def map_keywords_to_columns(self, keywords, relevant_tables, similarity_threshold=0.60):
         mapped_columns = {}
@@ -89,3 +94,4 @@ class SchemaMapper:
 
         # Return only the mapped columns
         return mapped_columns
+
