@@ -1,4 +1,4 @@
-from ..pdf_reader import PDFReader
+from ..documentation.pdf_reader import PDFReader
 
 class DocumentationPipeline:
     def __init__(self, pdf_path, embedding_handler):

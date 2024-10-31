@@ -1,9 +1,9 @@
 # Exposing the main classes from each module
 from .embedding_handler import EmbeddingHandler
-from .rag_system import RAGSystem
-from .pdf_reader import PDFReader
-from .schema_mapper import SchemaMapper
+from .documentation.rag_system import RAGSystem
+from .documentation.pdf_reader import PDFReader
+from .subschema.schema_mapper import SchemaMapper
 from .llm import LLM
-from .schema_extractor import SchemaExtractor
+from .subschema.schema_extractor import SchemaExtractor
 from .pipeline import Pipeline
 import pandas as pd

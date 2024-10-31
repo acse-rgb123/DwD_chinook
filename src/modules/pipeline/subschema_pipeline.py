@@ -1,7 +1,7 @@
 import pandas as pd
-from ..schema_mapper import SchemaMapper
-from ..schema_extractor import SchemaExtractor
-from ..subschema import SubschemaCreator
+from ..subschema.schema_mapper import SchemaMapper
+from ..subschema.schema_extractor import SchemaExtractor
+from ..subschema.subschema import SubschemaCreator
 
 class SubschemaPipeline:
     def __init__(self, db_file, embedding_handler):
@@ -28,12 +28,6 @@ class SubschemaPipeline:
         print("Mapping keywords to schema...")
         schema_mapper = SchemaMapper(schema, foreign_keys, self.embedding_handler)
         relevant_tables, relevant_columns = schema_mapper.identify_relevant_tables_and_columns(keywords)
-
-        necessary_tables = ['Customer', 'Invoice']
-        for table in necessary_tables:
-            if table not in relevant_tables:
-                relevant_tables.append(table)
-                print(f"Added necessary table: {table}")
 
         mapped_columns = schema_mapper.map_keywords_to_columns(keywords, relevant_tables)
 

@@ -2,7 +2,7 @@ import os
 import sqlite3
 import pandas as pd
 from ..embedding_handler import EmbeddingHandler
-from ..rag_system import RAGSystem
+from ..documentation.rag_system import RAGSystem
 from ..llm import LLM
 from .subschema_pipeline import SubschemaPipeline  
 from .documentation_pipeline import DocumentationPipeline  

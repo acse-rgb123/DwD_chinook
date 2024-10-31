@@ -10,7 +10,7 @@ class SchemaMapper:
         self.foreign_keys = foreign_keys  # Initialize foreign keys
         self.embedding_handler = embedding_handler
 
-    def identify_relevant_tables_and_columns(self, keywords, similarity_threshold=0.75):
+    def identify_relevant_tables_and_columns(self, keywords, similarity_threshold=0.55):
         relevant_tables = []  # Changed from set to list to allow appending in the main pipeline
         relevant_columns = []  # List to store relevant columns and their similarity scores
         keyword_embeddings = self.embedding_handler.get_embeddings_batch(keywords)  # Get embeddings for keywords
