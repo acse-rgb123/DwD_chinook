@@ -12,7 +12,7 @@ class SubschemaCreator:
                 for table, columns in self.schema.items():
                     if column in columns:
                         associated_tables.add(table)
-
+        
         print("\nAssociated Tables:")
         for table in associated_tables:
             print(f"    {table}")
@@ -28,7 +28,7 @@ class SubschemaCreator:
                         connections.append((table, relation['to_table'], {
                             'from_column': relation['from'], 'to_column': relation['to_column']
                         }))
-        
+
         # Debug: Print table connections
         for conn in connections:
             print(f"    {conn[0]} <-> {conn[1]} (From: {conn[2]['from_column']}, To: {conn[2]['to_column']})")
@@ -36,32 +36,60 @@ class SubschemaCreator:
         return connections
 
     def create_optimized_subschema(self, relevant_tables):
-        subschema_graph = nx.Graph()
+        # Step 1: Build a full graph with all tables and relationships
+        full_graph = nx.Graph()
+        
+        for table, columns in self.schema.items():
+            full_graph.add_node(table)
+        
+        for table, relations in self.foreign_keys.items():
+            for relation in relations:
+                full_graph.add_edge(
+                    table,
+                    relation['to_table'],
+                    from_column=relation['from'],
+                    to_column=relation['to_column']
+                )
 
-        # Add relevant tables as nodes
-        for table in relevant_tables:
-            if table in self.schema:
-                subschema_graph.add_node(table)
-                print(f"Added Node: {table}")
+        # Step 2: Extract the minimum connected subgraph
+        # Create a subgraph containing only the relevant tables initially
+        subschema_graph = full_graph.subgraph(relevant_tables).copy()
 
-        # Add relationships for relevant tables
-        for table in relevant_tables:
-            if table in self.foreign_keys:
-                for relation in self.foreign_keys[table]:
-                    if relation['to_table'] in relevant_tables:
-                        subschema_graph.add_edge(table, relation['to_table'], from_column=relation['from'], to_column=relation['to_column'])
-                        print(f"Added Edge: {table} -> {relation['to_table']} (From: {relation['from']}, To: {relation['to_column']})")
+        # Check if it's connected; if not, find the shortest paths between disconnected relevant tables
+        if not nx.is_connected(subschema_graph):
+            print("Adding necessary tables to connect relevant tables...")
+            for i, table in enumerate(relevant_tables):
+                for target_table in relevant_tables[i+1:]:
+                    if not nx.has_path(subschema_graph, table, target_table):
+                        # Find the shortest path in the full graph
+                        path = nx.shortest_path(full_graph, source=table, target=target_table)
+                        # Add only the necessary nodes and edges from the path
+                        for j in range(len(path) - 1):
+                            src, dest = path[j], path[j + 1]
+                            edge_data = full_graph.get_edge_data(src, dest)
+                            subschema_graph.add_node(src)
+                            subschema_graph.add_node(dest)
+                            subschema_graph.add_edge(src, dest, **edge_data)
 
-        # Print edges after adding relationships
-        print(f"Subschema Edges: {list(subschema_graph.edges(data=True))}")
+        # Final debug information
+        print("\nFinal Subschema Edges (only necessary connections):")
+        for edge in subschema_graph.edges(data=True):
+            print(f"{edge[0]} <-> {edge[1]} (From: {edge[2]['from_column']}, To: {edge[2]['to_column']})")
 
         return subschema_graph
 
-    def find_paths_between_tables(self, subgraph, start_table):
+    def find_paths_between_tables(self, subgraph, start_table=None):
+        # If start_table is not specified, use the first node in the subgraph
+        if start_table is None or start_table not in subgraph.nodes:
+            # Choose the first node in the subgraph as the start table if Customer is not relevant
+            start_table = list(subgraph.nodes)[0]
+            print(f"Using '{start_table}' as the start table for pathfinding.")
+
         paths = []
         for target_table in subgraph.nodes:
             if target_table != start_table:
                 try:
+                    # Attempt to find the shortest path between start_table and target_table
                     path = nx.shortest_path(subgraph, source=start_table, target=target_table)
                     path_with_columns = []
                     for i in range(len(path) - 1):
@@ -74,8 +102,9 @@ class SubschemaCreator:
                         })
                     paths.append(path_with_columns)
                 except nx.NetworkXNoPath:
-                    continue
-        
+                    print(f"No path found between '{start_table}' and '{target_table}'. Continuing...")
+                    continue  # Move to the next target_table if no path exists
+
         # Debug: Print Join Paths
         print("\nJoin Paths:")
         for path in paths:

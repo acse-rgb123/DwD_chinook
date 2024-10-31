@@ -1,8 +1,6 @@
 import pandas as pd
 from tabulate import tabulate
 
-import pandas as pd
-from tabulate import tabulate
 
 class SchemaMapper:
     def __init__(self, schema, foreign_keys, embedding_handler):
