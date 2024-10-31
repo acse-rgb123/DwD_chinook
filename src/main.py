@@ -2,7 +2,7 @@ import json
 import sys
 import os
 import openai
-from modules.pipeline import Pipeline
+from modules.pipeline.main_pipeline import Pipeline
 
 openai.api_key = 'sk-_ynWP8bFt1E-Lg6ZxIAt8YV1fdB8qU1SMkWCqMVRtmT3BlbkFJ_FWv5x5Oz1lT6vhGwUtODMSKo36FCBHBW30fYvD3sA'
 
