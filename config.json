@@ -1,6 +1,6 @@
 {
     "db_file": "chinook-database-master/ChinookDatabase/DataSources/Chinook_Sqlite.sqlite",
     "user_query": "List who have purchased tracks from more than 7 different genres.",
-    "pdf_path": "docs/Chinook_Database_Enriched_Documentation.pdf"
+    "pdf_path": "docs/Chinook_Database_Advanced_Documentation.pdf"
 }
   

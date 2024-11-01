@@ -47,6 +47,7 @@ def main():
 
     # Run the pipeline and get the analysis result
     analysis = pipeline.run()
+    print("Analysis of SQL results:", analysis)
 
 if __name__ == "__main__":
     main()
