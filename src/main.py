@@ -5,6 +5,7 @@ import openai
 from modules.pipeline.main_pipeline import Pipeline
 
 openai.api_key = 'sk-_ynWP8bFt1E-Lg6ZxIAt8YV1fdB8qU1SMkWCqMVRtmT3BlbkFJ_FWv5x5Oz1lT6vhGwUtODMSKo36FCBHBW30fYvD3sA'
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 def main():
     # Load the JSON configuration from a hardcoded config file

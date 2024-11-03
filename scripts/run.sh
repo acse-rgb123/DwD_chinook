@@ -34,6 +34,7 @@ pip install \
     tabulate \
     PyPDF2 \
     scikit-learn \
+    spacy \
     faiss-cpu > /dev/null 2>&1
 
 if [ $? -ne 0 ]; then
