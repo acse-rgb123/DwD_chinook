@@ -14,8 +14,6 @@ class LLM:
     def generate_sql_with_rag(self, user_query, joins, relevant_docs):
         # Build the documentation context from `relevant_docs`
         context = "\n".join(relevant_docs)
-        print("Retrieved Documentation Context:")
-        print(context)
         
         # Format the join conditions from the `joins` structure
         join_conditions = []
@@ -25,12 +23,6 @@ class LLM:
             from_column, to_column = join['columns']
             join_conditions.append(f"{table1}.{from_column} = {table2}.{to_column}")
             selected_tables.update([table1, table2])
-
-        # Construct the subschema context
-        subschema_context = f"Tables: {', '.join(selected_tables)}\nJoin Conditions:\n" + "\n".join(join_conditions)
-        
-        print("Subschema Context for LLM:")
-        print(subschema_context)
 
         # Construct the input text for the LLM with subschema information and user query
         input_text = f"""

@@ -1,9 +1,16 @@
+import os
+import spacy
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+from tabulate import tabulate
 import pandas as pd
 
-class RAGSystem:
-    def __init__(self, embedding_handler, documentation):
+class TableRAG:
+    def __init__(self, embedding_handler, documentation, schema):
         self.embedding_handler = embedding_handler
         self.documentation = documentation
+        self.schema = schema  # Store schema information
+        self.nlp = spacy.load("en_core_web_sm")  # Load spaCy model for NER
         self.doc_chunks, self.chunk_embeddings = self.process_and_embed_documentation()
 
     def process_and_embed_documentation(self):
@@ -17,81 +24,67 @@ class RAGSystem:
                 print(f"Warning: Empty document text for section '{doc_key}'. Skipping.")
                 continue
 
-            print(f"Processing section '{doc_key}' - Length: {len(doc_text)} characters")
-            
-            # Apply fixed-size chunking with 100 words per chunk
             sections = self.chunk_document(doc_text, max_chunk_size=100)
             for i, section in enumerate(sections):
                 chunk_key = f"{doc_key}_chunk_{i}"
                 doc_chunks[chunk_key] = section
-                # Embed each chunk
                 chunk_embeddings[chunk_key] = self.embedding_handler.get_embedding(section)
-                print(f"Embedded Chunk: {chunk_key} - Content: '{section[:50]}...'")  # Print first 50 chars of each chunk
             
         print("Completed embedding documentation chunks.")
-        print(f"Total Chunks Created: {len(doc_chunks)}")
-        
         return doc_chunks, chunk_embeddings
 
     def chunk_document(self, text, max_chunk_size=100):
-        # Split text into chunks of max_chunk_size words
         words = text.split()
-        chunks = []
-        
-        # Iterate over words in increments of max_chunk_size
-        for i in range(0, len(words), max_chunk_size):
-            chunk = " ".join(words[i:i + max_chunk_size])  # Join every 100 words into a chunk
-            chunks.append(chunk)
-        
-        print(f"Document split into {len(chunks)} chunks.")
-        for idx, chunk in enumerate(chunks[:5]):  # Print the first 5 chunks as a sample
-            print(f"Chunk {idx+1}: {chunk[:100]}...")  # Print first 100 chars of each chunk
-        
+        chunks = [" ".join(words[i:i + max_chunk_size]) for i in range(0, len(words), max_chunk_size)]
         return chunks
 
-    import pandas as pd
+    def extract_entities(self, text):
+        """Extract entities from text using spaCy NER."""
+        doc = self.nlp(text)
+        entities = [(ent.text, ent.label_) for ent in doc.ents]
+        return entities
 
-    def retrieve_relevant_docs(self, query, similarity_threshold=0.45):
+    def find_relevant_tables(self, user_query):
         """
-        Retrieve relevant document chunks based on similarity to the user query.
-        
-        Parameters:
-        - query (str): The user query to find relevant document chunks for.
-        - similarity_threshold (float): Minimum similarity score for a chunk to be considered relevant.
-        
-        Returns:
-        - list: Relevant document chunks above the similarity threshold.
+        Identify tables relevant to the user query by leveraging 
+        entities and contextual information from the documentation.
         """
-        # Embed the query for comparison with documentation chunks
-        query_embedding = self.embedding_handler.get_embedding(query)
-        similarities = []
+        # Extract entities from the query
+        query_entities = self.extract_entities(user_query)
+        print(f"Entities in User Query: {query_entities}")
 
-        # Compare query embedding to each chunk embedding
-        print("Calculating similarities between query and document chunks...")
-        for chunk_key, chunk_embedding in self.chunk_embeddings.items():
-            similarity = self.embedding_handler.calculate_similarity(query_embedding, chunk_embedding)
-            chunk_content = self.doc_chunks[chunk_key]  # Retrieve the actual content of the chunk
-            similarities.append((chunk_key, similarity, chunk_content))
-            print(f"Similarity with {chunk_key}: {similarity}")  # Debugging output for each similarity score
+        # Cross-reference entities with documentation to find related tables
+        relevant_tables = set()
+        for keyword, label in query_entities:
+            for doc_key, doc_text in self.documentation.items():
+                doc_entities = self.extract_entities(doc_text)
+                for doc_entity_text, doc_entity_label in doc_entities:
+                    if doc_entity_label == label:
+                        related_table = self.find_related_table_from_entity(doc_entity_text)
+                        if related_table:
+                            relevant_tables.add(related_table)
+        
+        print(f"Relevant Tables Identified: {relevant_tables}")
+        return list(relevant_tables)
 
-        # Sort chunks by similarity score and select top 10
-        sorted_chunks = sorted(similarities, key=lambda x: x[1], reverse=True)
-        top_chunks = [(chunk_key, similarity, chunk_content) for chunk_key, similarity, chunk_content in sorted_chunks if similarity >= similarity_threshold]
+    def find_related_table_from_entity(self, entity_text):
+        """
+        Use schema embeddings to find a table related to the entity text.
+        """
+        entity_embedding = self.embedding_handler.get_embedding(entity_text)
+        max_similarity = 0
+        best_match_table = None
 
-        if not top_chunks:
-            print("No chunks found above the similarity threshold.")
-            return []
+        # Compare entity embedding with each table's embedding in the schema
+        for table in self.schema.keys():
+            table_embedding = self.embedding_handler.get_embedding(table)
+            similarity = cosine_similarity([entity_embedding], [table_embedding])[0][0]
+            
+            if similarity > max_similarity:
+                max_similarity = similarity
+                best_match_table = table
 
-        # Format the output in a structured DataFrame for clear display
-        print("\nTop 10 Similarity Scoring Chunks:")
-        top_chunks_df = pd.DataFrame(top_chunks[:10], columns=["Chunk Key", "Similarity Score", "Chunk Content"])
-        top_chunks_df["Chunk Content"] = top_chunks_df["Chunk Content"].apply(lambda x: x[:200] + "..." if len(x) > 200 else x)
-
-        # Print the table in markdown format for clearer visibility in outputs
-        print(top_chunks_df.to_markdown(index=False, tablefmt="pipe"))
-
-        # Return only the content of relevant chunks
-        relevant_chunks = [chunk_content for _, similarity, chunk_content in top_chunks]
-
-        return relevant_chunks
-
+        if max_similarity > 0.5:  # Only return if similarity threshold is met
+            print(f"Entity '{entity_text}' matched with table '{best_match_table}' (Similarity: {max_similarity})")
+            return best_match_table
+        return None

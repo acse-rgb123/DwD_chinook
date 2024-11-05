@@ -18,26 +18,28 @@ class Pipeline:
         self.llm = LLM()
         
         # Initialize documentation and subschema pipelines
-        self.documentation_pipeline = DocumentationPipeline(pdf_path, self.embedding_handler)
-        self.subschema_pipeline = SubschemaPipeline(self.db_file, self.embedding_handler)
+        self.documentation_pipeline = DocumentationPipeline(pdf_path, self.embedding_handler, db_file)
+        self.subschema_pipeline = SubschemaPipeline(db_file, self.embedding_handler)
 
-    def generate_sql(self, joins, relevant_docs, relevant_tables):
+    def generate_sql(self, joins, relevant_tables):
         print("Generating SQL query with LLM...")
 
-        # Pass subschema (tables and joins) as context
+        # Prepare subschema context
+        subschema_context = f"Tables: {', '.join(relevant_tables)}\nJoin Conditions:\n" + "\n".join(
+            [f"{j['tables'][0]}.{j['columns'][0]} = {j['tables'][1]}.{j['columns'][1]}" for j in joins]
+        )
+
         sql_query = self.llm.generate_sql_with_rag(
             self.user_query,
             joins,
-            relevant_docs
+            relevant_tables
         )
-        print(f"Generated SQL Query:\n{sql_query}")
         return sql_query
 
     def execute_sql(self, sql_query):
         print("Executing SQL query...")
         conn = sqlite3.connect(self.db_file)
         try:
-            # Attempt to execute the initial SQL query
             df = pd.read_sql_query(sql_query, conn)
             if df is not None and not df.empty:
                 print("\nSQL Query Results (Pandas DataFrame):")
@@ -49,7 +51,6 @@ class Pipeline:
         except Exception as e:
             print(f"Error executing query on first attempt: {e}\nQuery: {sql_query}")
 
-            # Extract SQL from the LLM output if the initial query fails
             cleaned_sql_query = self.extract_sql_from_output(sql_query)
             if cleaned_sql_query:
                 print("Retrying with cleaned SQL query...")
@@ -82,22 +83,22 @@ class Pipeline:
 
     def run(self):
         """Run the entire pipeline."""
-        # Retrieve relevant document chunks
-        print("Retrieving relevant documentation chunks for query context...")
-        relevant_docs = self.documentation_pipeline.retrieve_relevant_chunks(self.user_query)
+        # Retrieve relevant tables based on the documentation
+        doc_tables = self.documentation_pipeline.retrieve_relevant_tables(self.user_query)
         
-        # Extract keywords
+        # Extract keywords and find additional tables based on schema mapping
         keywords = self.subschema_pipeline.extract_keywords(self.user_query)
+        schema_tables = self.subschema_pipeline.identify_relevant_tables(keywords)
 
-        # Identify relevant tables
-        relevant_tables = self.subschema_pipeline.identify_relevant_tables(keywords)
-        print("Relevant Tables:", relevant_tables)
+        # Combine all tables identified from documentation and schema mapping
+        relevant_tables = list(set(doc_tables + schema_tables))
+        print("Final List of Relevant Tables:", relevant_tables)
 
         # Generate joins between relevant tables
         joins = self.subschema_pipeline.create_joins(relevant_tables)
 
         # Generate the SQL query using tables and joins as subschema context
-        sql_query = self.generate_sql(joins, relevant_docs, relevant_tables)
+        sql_query = self.generate_sql(joins, relevant_tables)
 
         # Execute the SQL query
         result_df = self.execute_sql(sql_query)

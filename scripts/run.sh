@@ -2,7 +2,6 @@
 
 # Step 0: Check if Python is installed and at least version 3.6
 PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
-
 REQUIRED_VERSION="3.6"
 if [[ "$(printf '%s\n' "$REQUIRED_VERSION" "$PYTHON_VERSION" | sort -V | head -n1)" != "$REQUIRED_VERSION" ]]; then
     echo "Error: Python 3.6 or higher is required."
@@ -44,9 +43,20 @@ else
   echo "Dependencies installed successfully."
 fi
 
-# Step 4: Run main.py from the src directory
+# Step 4: Download the spaCy language model
+echo "Downloading spaCy language model..."
+python -m spacy download en_core_web_sm > /dev/null 2>&1
+
+if [ $? -ne 0 ]; then
+  echo "Error downloading spaCy language model."
+  exit 1
+else
+  echo "spaCy language model downloaded successfully."
+fi
+
+# Step 5: Run main.py from the src directory
 echo "Running main.py..."
 python ./src/main.py
 
-# Step 5: Deactivate the virtual environment after execution
+# Step 6: Deactivate the virtual environment after execution
 deactivate
