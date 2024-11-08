@@ -2,13 +2,14 @@ import os
 import sqlite3
 import re
 import pandas as pd
-from ..embedding_handler import EmbeddingHandler
-from ..llm import LLM
-from .subschema_pipeline import SubschemaPipeline  
-from .documentation_pipeline import DocumentationPipeline  
+from ..other.embedding_handler import EmbeddingHandler
+from ..other.llm import LLM
+from .subschema_pipeline import SubschemaPipeline
+from .documentation_pipeline import DocumentationPipeline
+from ..other.keyword_extractor import KeywordExtractor
 
 class Pipeline:
-    def __init__(self, db_file, user_query, pdf_path, output_dir='./data'):
+    def __init__(self, db_file, user_query, pdf_path, output_dir="./data"):
         self.db_file = os.path.abspath(db_file)
         self.user_query = user_query
         self.output_dir = output_dir
@@ -16,9 +17,11 @@ class Pipeline:
         # Initialize components
         self.embedding_handler = EmbeddingHandler(output_dir=self.output_dir)
         self.llm = LLM()
-        
+
         # Initialize documentation and subschema pipelines
-        self.documentation_pipeline = DocumentationPipeline(pdf_path, self.embedding_handler, db_file)
+        self.documentation_pipeline = DocumentationPipeline(
+            pdf_path, self.embedding_handler, db_file
+        )
         self.subschema_pipeline = SubschemaPipeline(db_file, self.embedding_handler)
 
     def generate_sql(self, joins, relevant_tables):
@@ -26,17 +29,28 @@ class Pipeline:
 
         # Prepare subschema context
         subschema_context = f"Tables: {', '.join(relevant_tables)}\nJoin Conditions:\n" + "\n".join(
-            [f"{j['tables'][0]}.{j['columns'][0]} = {j['tables'][1]}.{j['columns'][1]}" for j in joins]
+            [
+                f"{j['tables'][0]}.{j['columns'][0]} = {j['tables'][1]}.{j['columns'][1]}"
+                for j in joins
+            ]
         )
 
         sql_query = self.llm.generate_sql_with_rag(
-            self.user_query,
-            joins,
-            relevant_tables
+            self.user_query, joins, relevant_tables
         )
         return sql_query
 
-    def execute_sql(self, sql_query):
+    def execute_sql(self, output_text):
+        # Extract SQL from the LLM output
+        match = re.search(r"```sql\n(.*?)```", output_text, re.DOTALL)
+        if match:
+            sql_query = match.group(1).strip()
+            print(f"Extracted SQL Query:\n{sql_query}")
+        else:
+            print("No SQL code block found in the output.")
+            return []
+
+        # Execute the SQL query
         print("Executing SQL query...")
         conn = sqlite3.connect(self.db_file)
         try:
@@ -44,48 +58,23 @@ class Pipeline:
             if df is not None and not df.empty:
                 print("\nSQL Query Results (Pandas DataFrame):")
                 print(df.to_string(index=False))
-                return df
+                return df.to_dict(orient="records")
             else:
                 print("No results returned from the SQL query.")
-                return df
+                return []
         except Exception as e:
-            print(f"Error executing query on first attempt: {e}\nQuery: {sql_query}")
-
-            cleaned_sql_query = self.extract_sql_from_output(sql_query)
-            if cleaned_sql_query:
-                print("Retrying with cleaned SQL query...")
-                try:
-                    df = pd.read_sql_query(cleaned_sql_query, conn)
-                    if df is not None and not df.empty:
-                        print("\nSQL Query Results (Pandas DataFrame):")
-                        print(df.to_string(index=False))
-                    else:
-                        print("No results returned from the cleaned SQL query.")
-                    return df
-                except Exception as e:
-                    print(f"Error executing cleaned query: {e}\nCleaned Query: {cleaned_sql_query}")
-                    return None
-            else:
-                print("No valid SQL could be extracted from the output.")
-                return None
+            print(f"Error executing query: {e}\nQuery: {sql_query}")
+            return []
         finally:
             conn.close()
-
-    def extract_sql_from_output(self, output_text):
-        match = re.search(r"```sql\n(.*?)```", output_text, re.DOTALL)
-        if match:
-            extracted_sql = match.group(1).strip()
-            print(f"Extracted SQL Query:\n{extracted_sql}")
-            return extracted_sql
-        else:
-            print("No SQL code block found in the output.")
-            return None
 
     def run(self):
         """Run the entire pipeline."""
         # Retrieve relevant tables based on the documentation
-        doc_tables = self.documentation_pipeline.retrieve_relevant_tables(self.user_query)
-        
+        doc_tables = self.documentation_pipeline.retrieve_relevant_tables(
+            self.user_query
+        )
+
         # Extract keywords and find additional tables based on schema mapping
         keywords = self.subschema_pipeline.extract_keywords(self.user_query)
         schema_tables = self.subschema_pipeline.identify_relevant_tables(keywords)
@@ -106,4 +95,17 @@ class Pipeline:
         # Analyze the SQL and result
         analysis = self.llm.analyze_result(self.user_query, sql_query, result_df)
 
-        return analysis
+        # Print results to the terminal
+        print("\nGenerated SQL Query:")
+        print(sql_query)
+        print("\nSQL Query Results:")
+        if result_df:
+            df = pd.DataFrame(result_df)
+            print(df.to_string(index=False))
+        else:
+            print("No results returned.")
+
+        print("\nAnalysis:")
+        print(analysis)
+
+        return sql_query, result_df, analysis

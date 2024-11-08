@@ -34,7 +34,9 @@ pip install \
     PyPDF2 \
     scikit-learn \
     spacy \
-    faiss-cpu > /dev/null 2>&1
+    faiss-cpu \
+    torch \
+    transformers > /dev/null 2>&1
 
 if [ $? -ne 0 ]; then
   echo "Error installing dependencies."
@@ -54,9 +56,16 @@ else
   echo "spaCy language model downloaded successfully."
 fi
 
-# Step 5: Run main.py from the src directory
+# Step 5: Set the OpenAI API key from an environment variable or prompt the user
+# Step 5: Hardcode the OpenAI API key
+OPENAI_API_KEY="sk-_ynWP8bFt1E-Lg6ZxIAt8YV1fdB8qU1SMkWCqMVRtmT3BlbkFJ_FWv5x5Oz1lT6vhGwUtODMSKo36FCBHBW30fYvD3sA"
+
+# Export the API key so it can be accessed by Python
+export OPENAI_API_KEY
+
+# Step 6: Run main.py from the src directory
 echo "Running main.py..."
 python ./src/main.py
 
-# Step 6: Deactivate the virtual environment after execution
+# Step 7: Deactivate the virtual environment after execution
 deactivate

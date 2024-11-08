@@ -1,5 +1,6 @@
 import networkx as nx
 
+
 class SubschemaCreator:
     def __init__(self, schema, foreign_keys):
         self.schema = schema
@@ -12,7 +13,7 @@ class SubschemaCreator:
                 for table, columns in self.schema.items():
                     if column in columns:
                         associated_tables.add(table)
-        
+
         print("\nAssociated Tables:")
         for table in associated_tables:
             print(f"    {table}")
@@ -24,31 +25,40 @@ class SubschemaCreator:
         for table in associated_tables:
             if table in self.foreign_keys:
                 for relation in self.foreign_keys[table]:
-                    if relation['to_table'] in associated_tables:
-                        connections.append((table, relation['to_table'], {
-                            'from_column': relation['from'], 'to_column': relation['to_column']
-                        }))
+                    if relation["to_table"] in associated_tables:
+                        connections.append(
+                            (
+                                table,
+                                relation["to_table"],
+                                {
+                                    "from_column": relation["from"],
+                                    "to_column": relation["to_column"],
+                                },
+                            )
+                        )
 
         # Debug: Print table connections
         for conn in connections:
-            print(f"    {conn[0]} <-> {conn[1]} (From: {conn[2]['from_column']}, To: {conn[2]['to_column']})")
+            print(
+                f"    {conn[0]} <-> {conn[1]} (From: {conn[2]['from_column']}, To: {conn[2]['to_column']})"
+            )
 
         return connections
 
     def create_optimized_subschema(self, relevant_tables):
         # Step 1: Build a full graph with all tables and relationships
         full_graph = nx.Graph()
-        
+
         for table, columns in self.schema.items():
             full_graph.add_node(table)
-        
+
         for table, relations in self.foreign_keys.items():
             for relation in relations:
                 full_graph.add_edge(
                     table,
-                    relation['to_table'],
-                    from_column=relation['from'],
-                    to_column=relation['to_column']
+                    relation["to_table"],
+                    from_column=relation["from"],
+                    to_column=relation["to_column"],
                 )
 
         # Step 2: Extract the minimum connected subgraph
@@ -59,10 +69,12 @@ class SubschemaCreator:
         if not nx.is_connected(subschema_graph):
             print("Adding necessary tables to connect relevant tables...")
             for i, table in enumerate(relevant_tables):
-                for target_table in relevant_tables[i+1:]:
+                for target_table in relevant_tables[i + 1 :]:
                     if not nx.has_path(subschema_graph, table, target_table):
                         # Find the shortest path in the full graph
-                        path = nx.shortest_path(full_graph, source=table, target=target_table)
+                        path = nx.shortest_path(
+                            full_graph, source=table, target=target_table
+                        )
                         # Add only the necessary nodes and edges from the path
                         for j in range(len(path) - 1):
                             src, dest = path[j], path[j + 1]
@@ -74,7 +86,9 @@ class SubschemaCreator:
         # Final debug information
         print("\nFinal Subschema Edges (only necessary connections):")
         for edge in subschema_graph.edges(data=True):
-            print(f"{edge[0]} <-> {edge[1]} (From: {edge[2]['from_column']}, To: {edge[2]['to_column']})")
+            print(
+                f"{edge[0]} <-> {edge[1]} (From: {edge[2]['from_column']}, To: {edge[2]['to_column']})"
+            )
 
         return subschema_graph
 
@@ -90,26 +104,37 @@ class SubschemaCreator:
             if target_table != start_table:
                 try:
                     # Attempt to find the shortest path between start_table and target_table
-                    path = nx.shortest_path(subgraph, source=start_table, target=target_table)
+                    path = nx.shortest_path(
+                        subgraph, source=start_table, target=target_table
+                    )
                     path_with_columns = []
                     for i in range(len(path) - 1):
                         table1 = path[i]
                         table2 = path[i + 1]
                         edge_data = subgraph.get_edge_data(table1, table2)
-                        path_with_columns.append({
-                            'tables': (table1, table2),
-                            'columns': (edge_data['from_column'], edge_data['to_column'])
-                        })
+                        path_with_columns.append(
+                            {
+                                "tables": (table1, table2),
+                                "columns": (
+                                    edge_data["from_column"],
+                                    edge_data["to_column"],
+                                ),
+                            }
+                        )
                     paths.append(path_with_columns)
                 except nx.NetworkXNoPath:
-                    print(f"No path found between '{start_table}' and '{target_table}'. Continuing...")
+                    print(
+                        f"No path found between '{start_table}' and '{target_table}'. Continuing..."
+                    )
                     continue  # Move to the next target_table if no path exists
 
         # Debug: Print Join Paths
         print("\nJoin Paths:")
         for path in paths:
             for step in path:
-                print(f"    {step['tables'][0]} -> {step['tables'][1]} (From: {step['columns'][0]}, To: {step['columns'][1]})")
+                print(
+                    f"    {step['tables'][0]} -> {step['tables'][1]} (From: {step['columns'][0]}, To: {step['columns'][1]})"
+                )
 
         return paths
 
@@ -125,7 +150,7 @@ class SubschemaCreator:
                     if column in cols:
                         table = tbl
                         break
-                
+
                 if table and column in self.schema[table]:
                     valid_columns.append(f"{table}.{column}")
                 else:

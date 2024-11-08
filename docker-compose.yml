@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  db:
+    image: nouchka/sqlite3                    # Use this for an SQLite container, or switch to 'postgres:latest' for PostgreSQL
+    container_name: db_container
+    volumes:
+      - ./chinook-database-master:/data       # Mounts the local 'chinook-database-master' folder to '/data' in the container
+    command: tail -f /dev/null                # Keeps the SQLite container running
+
+  text2sql:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: text2sql_container
+    depends_on:
+      - db                                    # Ensures the 'db' service starts before this service
+    env_file:
+      - .env                                  # Load environment variables, including OPENAI_API_KEY
+    environment:
+      - DB_PATH=/app/data/chinook_database_master.sqlite
+    volumes:
+      - ./data:/app/data                     # Mounts the local 'data' directory for database access
+      - ./src:/app/src                       # Mounts the 'src' directory for live code updates
+      - ./config.json:/app/config.json       # Mounts the 'config.json' to the container
+    command: python src/main.py
+
+  frontend:
+    image: your-frontend-image               # Replace with your actual front-end image or a build context
+    container_name: frontend_container
+    build:
+      context: ./app                         # Ensure your front-end code is in the 'app' directory
+    ports:
+      - "3000:3000"                          # Maps port 3000 on the host to port 3000 in the container
+    depends_on:
+      - text2sql                             # Ensures the 'text2sql' container starts first
+    volumes:
+      - ./app:/usr/src/app                   # Mounts the 'app' folder for live updates (adjust path as needed)

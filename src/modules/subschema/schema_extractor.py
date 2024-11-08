@@ -3,36 +3,18 @@ import os
 import torch
 from transformers import RobertaTokenizer, RobertaModel
 from sklearn.metrics.pairwise import cosine_similarity
+from ..other.keyword_extractor import KeywordExtractor
+
 
 class SchemaExtractor:
-    def __init__(self, db_file, embedding_handler):
+    def __init__(self, db_file, embedding_handler, extract_method="roberta"):
         self.db_file = db_file
         self.embedding_handler = embedding_handler
-        self.tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
-        self.model = RobertaModel.from_pretrained('roberta-base', add_pooling_layer=False)
+        self.extract_method = extract_method
 
-    def extract_keywords_with_roberta(self, query, similarity_threshold=0.7, window_size=2):
-        inputs = self.tokenizer(query, return_tensors="pt")
-        with torch.no_grad():
-            outputs = self.model(**inputs)
-            token_embeddings = outputs.last_hidden_state.squeeze(0)
-
-        tokens = self.tokenizer.convert_ids_to_tokens(inputs['input_ids'][0])
-        query_embedding = token_embeddings.mean(dim=0).unsqueeze(0)
-        similarities = cosine_similarity(query_embedding, token_embeddings)
-
-        keywords = [tokens[i].replace("Ġ", "") for i, sim in enumerate(similarities[0]) if sim >= similarity_threshold and tokens[i].isalpha()]
-        phrases = []
-        for i in range(len(tokens)):
-            for window in range(2, window_size + 1):
-                if i + window <= len(tokens):
-                    phrase = " ".join([tokens[j].replace("Ġ", "") for j in range(i, i + window)])
-                    phrase_embedding = token_embeddings[i:i + window].mean(dim=0)
-                    phrase_similarity = cosine_similarity(query_embedding, phrase_embedding.unsqueeze(0))[0][0]
-                    if phrase_similarity >= similarity_threshold and all(word.isalpha() for word in phrase.split()):
-                        phrases.append(phrase)
-
-        return list(set(keywords + phrases))
+    def extract_keywords(self, query, similarity_threshold=0.7, window_size=4):
+        extractor = KeywordExtractor(method=self.extract_method)
+        return extractor.extract_keywords(query, similarity_threshold, window_size)
 
     def extract_schema_from_db(self):
         if not os.path.exists(self.db_file):
@@ -47,7 +29,7 @@ class SchemaExtractor:
             schema = {}
             if not tables:
                 raise ValueError("No tables found in the database.")
-            
+
             for table in tables:
                 table_name = table[0]
                 cursor.execute(f"PRAGMA table_info({table_name});")
@@ -56,7 +38,7 @@ class SchemaExtractor:
                     schema[table_name] = [col[1] for col in columns]
                 else:
                     print(f"Warning: No columns found for table {table_name}.")
-            
+
             conn.close()
             return schema
         except Exception as e:
@@ -78,11 +60,12 @@ class SchemaExtractor:
             cursor.execute(f"PRAGMA foreign_key_list({table_name});")
             keys = cursor.fetchall()
             for key in keys:
-                foreign_keys.setdefault(table_name, []).append({
-                    "from": key[3],         # Column in the current table
-                    "to_table": key[2],     # Table it references
-                    "to_column": key[4]     # Column in the referenced table
-                })
-
+                foreign_keys.setdefault(table_name, []).append(
+                    {
+                        "from": key[3],  # Column in the current table
+                        "to_table": key[2],  # Table it references
+                        "to_column": key[4],  # Column in the referenced table
+                    }
+                )
         conn.close()
         return foreign_keys

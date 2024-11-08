@@ -2,6 +2,7 @@ from ..documentation.rag_system import TableRAG
 from ..documentation.pdf_reader import PDFReader
 from ..subschema.schema_extractor import SchemaExtractor
 
+
 class DocumentationPipeline:
     def __init__(self, pdf_path, embedding_handler, db_file):
         self.pdf_path = pdf_path
